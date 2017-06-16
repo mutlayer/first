@@ -22,6 +22,7 @@
 	JSONArray list = new JSONArray();
 	JSONObject obj = new JSONObject();
 	
+	
 	obj.put("cur_time",cur_time);	//현재시간
 	//list.add(obj);
 	out.println(obj);
