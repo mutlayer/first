@@ -14,10 +14,7 @@
 	//out.println(inet.getHostAddress());
 	String cur_time = null;
 	
-		cur_time = request.getAttribute("cur_time").toString();
-		
-	
-	
+	cur_time = request.getAttribute("cur_time").toString();
 	
 	JSONArray list = new JSONArray();
 	JSONObject obj = new JSONObject();
