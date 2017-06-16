@@ -1,0 +1,1270 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="forex">
+
+	<select id="loginFlag" parameterType="hashmap" resultType="hashmap">
+		<![CDATA[
+			SELECT
+			    A.USER_ID,
+			    A.USER_NAME,
+			    A.USER_PWD,
+			    A.LOGIN_FAIL_CNT,
+			    PwdCompare(#{pw},A.password) PWD,
+			    B.INSERTDATE,B.UPDATEDATE,
+			    A.RECOMMEND_ID,
+				A.USER_BANK_CD,
+				A.USER_BANK_NM,
+				A.USER_BANK_NUMBER,
+				A.USER_PHONE_NUMBER,
+				A.DEL_YN,
+				C.BLOCK_INFO TELBLOCK,
+				D.BLOCK_INFO IPBLOCK
+			FROM
+			    TB_USER AS A
+			    LEFT OUTER JOIN (SELECT BLOCK_INFO FROM TB_BLOCK WHERE BLOCK_TYPE = 'TEL' AND DEL_YN='N') C ON A.USER_PHONE_NUMBER = C.BLOCK_INFO
+				LEFT OUTER JOIN (SELECT BLOCK_INFO FROM TB_BLOCK WHERE BLOCK_TYPE = 'IP' AND DEL_YN='N') D ON A.USER_IP = C.BLOCK_INFO
+			    ,TB_USER_AMOUNT AS B
+			where A.USER_ID = #{id}
+			  AND A.USER_ID = B.USER_ID
+			  
+		]]>
+	</select>
+	
+	<select id="loginFlag02" parameterType="hashmap" resultType="hashmap">
+		<![CDATA[
+			SELECT
+			    A.USER_ID,
+			    A.USER_PWD,
+			    A.LOGIN_FAIL_CNT,			    
+			    A.INSERTDATE,A.UPDATEDATE
+			FROM
+			    TB_USER AS A
+			where A.USER_ID = #{id}
+		]]>
+	</select>
+	
+	<select id="loginyn" parameterType="hashmap" resultType="String">
+		<![CDATA[
+			SELECT PwdCompare(#{pw},password) as PWD FROM TB_USER
+			 where USER_ID = #{id}
+		]]>
+	</select>
+	
+	<select id="selectRate" parameterType="hashmap" resultType="hashmap">
+		<![CDATA[
+			SELECT
+			    RATE
+			FROM
+			    TB_COMMON_RATE
+			WHERE RATE_KEY = #{event}
+			AND STARTHH <=#{hh}
+			AND ENDHH >=#{hh}
+		]]>
+	</select>
+	
+	<select id="loginData" parameterType="hashmap" resultType="hashmap">
+		<![CDATA[
+			select *
+			  from (
+			select ROW_NUMBER() OVER(ORDER BY ORDER_TIME DESC) AS ROWNUM,a.ACTKEY,a.OPTION_TYPE,a.EVENT,a.ORDER_TIME,a.COMP_TIME,a.INVEST_MONEY,a.CALLPUT,a.START_RATE
+						      ,a.EXT_RATE,c.TOT_AMOUNT,C.PRACTICE_AMOUNT
+						 from TB_USER_BET a
+						     ,TB_USER b
+						     ,TB_USER_AMOUNT C
+						 where a.USER_ID = b.user_id
+						   and a.STATUS = 0
+						   and a.USER_ID = #{id}
+						   and b.USER_ID = C.USER_ID
+						   ) T1
+			 where T1.ROWNUM = 1
+		]]>
+	</select>
+	
+	<select id="loginInfo" parameterType="hashmap" resultType="hashmap">
+		<![CDATA[
+			select '0' as ACTKEY,'event' as 'EVENT',GETDATE() as ORDER_TIME,GETDATE() as COMP_TIME ,0 as INVEST_MONEY,'option' as 'OPTION',0 as START_RATE
+			      ,0 as EXT_RATE,a.TOT_AMOUNT,'game_type'as GAME_TYPE,'option_type' as OPTION_TYPE,a.PRACTICE_AMOUNT
+			 from TB_USER_AMOUNT a
+			     ,TB_USER b
+			 where a.USER_ID = b.USER_ID			   
+			   and a.USER_ID =#{id}
+		]]>
+	</select>
+	
+	<select id="selectUserList" parameterType="hashmap" resultType="hashmap">
+		<![CDATA[
+		SELECT ROWNUM,CNT,USER_ID,USER_NAME,USER_PHONE_NUMBER,USER_BANK_NUMBER,USER_BANK_CD,USER_BANK_NM
+			,RECOMMEND_ID,USER_LEVEL,USER_STATUS,DEL_YN,USER_IP,LOGIN_FAIL_CNT,INSERTDATE,UPDATEDATE,UPDATE_ID
+			,UPDATE_IP,POINT_STYLE,RATE_cTR,MAX_INVEST,MIN_INVEST
+		  FROM 
+		  (
+			SELECT 
+			]]>	<if test="column==NULL">
+		 			<![CDATA[
+					ROW_NUMBER() OVER(ORDER BY USER_NAME) AS ROWNUM
+					]]> 
+				 </if>
+				 <if test="column != NULL">
+				 <![CDATA[
+					ROW_NUMBER() OVER(ORDER BY ${column}) AS ROWNUM
+					]]> 
+				 </if> 
+				 <![CDATA[
+			,COUNT(*) OVER() AS CNT,USER_ID,USER_NAME,USER_PHONE_NUMBER,USER_BANK_NUMBER,USER_BANK_CD,USER_BANK_NM
+		      ,RECOMMEND_ID,USER_LEVEL,USER_STATUS,DEL_YN,USER_IP,LOGIN_FAIL_CNT,INSERTDATE,UPDATEDATE
+			  ,UPDATE_ID,UPDATE_IP,POINT_STYLE,RATE_CTR,MAX_INVEST,MIN_INVEST
+		  FROM TB_USER
+		 WHERE 1=1
+		]]> 
+		 <if test="user_id !=NULL">
+		 <![CDATA[
+			AND USER_ID like '%'+#{user_id}+'%'
+			]]> 
+		 </if>
+		 <if test="user_name !=NULL">
+		 <![CDATA[
+			AND USER_NAME like '%'+#{user_name}+'%'
+			]]> 
+		 </if>
+		<![CDATA[
+		) AS A
+		WHERE ROWNUM <=${cur_page}
+		  AND ROWNUM >=${cur_page}-9
+		]]> 
+	</select>
+	
+	<select id="selectOrderList" parameterType="hashmap" resultType="hashmap">
+		<![CDATA[
+		SELECT ROWNUM,CNT,A.USER_ID,A.USER_NAME,A.ORDER_TIME,A.COMP_TIME,A.STATUS,A.EVENT,A.INVEST_MONEY,A.OPTION_TYPE
+	  			,A.START_RATE,A.END_RATE,A.EXT_RATE,A.INVEST_RESULT,A.RESULT_FEE,A.CALLPUT
+		  FROM 
+		  (
+			SELECT 
+			]]>	<if test="column==NULL">
+		 			<![CDATA[
+					ROW_NUMBER() OVER(ORDER BY ORDER_TIME DESC) AS ROWNUM
+					]]> 
+				 </if>
+				 <if test="column != NULL">
+				 <![CDATA[
+					ROW_NUMBER() OVER(ORDER BY ${column}) AS ROWNUM
+					]]> 
+				 </if> 
+				 <![CDATA[
+			,COUNT(BET.USER_ID) OVER() AS CNT,BET.USER_ID,U.USER_NAME,BET.ORDER_TIME,BET.COMP_TIME,BET.STATUS,BET.EVENT,BET.INVEST_MONEY,BET.OPTION_TYPE
+			,BET.START_RATE,BET.END_RATE,BET.EXT_RATE,BET.INVEST_RESULT,BET.RESULT_FEE,BET.CALLPUT
+		  FROM TB_USER_BET AS BET, TB_USER AS U
+		 WHERE BET.USER_ID = U.USER_ID
+		]]> 
+		 <if test="user_id !=NULL">
+		 <![CDATA[
+			AND BET.USER_ID like '%'+#{user_id}+'%'
+			]]> 
+		 </if>
+		 <if test="user_name !=NULL">
+		 <![CDATA[
+			AND U.USER_NAME like '%'+#{user_name}+'%'
+			]]> 
+		 </if>
+		<![CDATA[
+		) AS A
+		WHERE ROWNUM <=${cur_page}
+		  AND ROWNUM >=${cur_page}-19
+		]]> 
+	</select>
+	
+	<select id="selectDepositList" parameterType="hashmap" resultType="hashmap">
+		<![CDATA[
+		SELECT ROWNUM,CNT,ID,ACCOUNT_NUMBER,APPLY_DATE,APPLY_MONEY,DEPOSIT_STATUS,PROCESSED_MONEY,TOTAL_AMOUNT,INSERTDATE,UPDATEDATE,DEPOSIT_BONUS,UPDATEID
+		  FROM 
+		  (
+			SELECT 
+			]]>	<if test="column==NULL">
+		 			<![CDATA[
+					ROW_NUMBER() OVER(ORDER BY APPLY_DATE DESC) AS ROWNUM
+					]]> 
+				 </if>
+				 <if test="column != NULL">
+				 <![CDATA[
+					ROW_NUMBER() OVER(ORDER BY ${column}) AS ROWNUM
+					]]> 
+				 </if> 
+				 <![CDATA[
+			,COUNT(ID) OVER() AS CNT,ID,ACCOUNT_NUMBER,APPLY_DATE,APPLY_MONEY,DEPOSIT_STATUS,PROCESSED_MONEY,TOTAL_AMOUNT,INSERTDATE,UPDATEDATE,DEPOSIT_BONUS,UPDATEID
+		  FROM TB_DEPOSIT
+		 WHERE 1=1
+		]]> 
+		 <if test="user_id !=NULL">
+		 <![CDATA[
+			AND ID like '%'+#{user_id}+'%'
+			]]> 
+		 </if>
+		 <if test="user_name !=NULL">
+		 <![CDATA[
+			AND U.USER_NAME like '%'+#{user_name}+'%'
+			]]> 
+		 </if>
+		<![CDATA[
+		) AS A
+		WHERE ROWNUM <=${cur_page}
+		  AND ROWNUM >=${cur_page}-19
+		]]> 
+	</select>
+	
+	<select id="selectUserAccount" parameterType="hashmap" resultType="hashmap">
+		<![CDATA[
+			select A.USER_ID,A.ACCOUNT_NUMBER,B.USER_NAME,A.TOT_AMOUNT
+			      ,A.BONUS,A.INCOMP_BONUS,A.POSSIBLE_AMOUNT,A.UPDATEDATE
+			  from TB_USER_AMOUNT A
+			      ,TB_USER B
+			 WHERE A.USER_ID = B.USER_ID
+			   
+			   
+		]]>
+	</select>
+	
+	<select id="selectUserDetail" parameterType="hashmap" resultType="hashmap">
+		<![CDATA[
+			SELECT
+			    A.USER_ID,
+			    A.USER_NAME,
+			    A.USER_BANK_NM,
+			    A.USER_BANK_NUMBER,
+			    B.TOT_AMOUNT,
+			    B.LAST_AMOUNT,
+			    B.POSSIBLE_AMOUNT,
+			    B.PRACTICE_AMOUNT
+			FROM
+			    TB_USER A,
+			    TB_USER_AMOUNT B
+			where A.USER_ID = #{user_id}
+			  AND A.USER_ID = B.USER_ID
+		]]>
+	</select>
+	
+	<select id="selectUserDetail_pop" parameterType="hashmap" resultType="hashmap">
+		<![CDATA[
+			SELECT
+			    A.USER_ID,
+				A.USER_NAME,
+				A.USER_BANK_NM,
+				A.USER_BANK_NUMBER,
+				B.TOT_AMOUNT,
+				B.LAST_AMOUNT,
+				B.POSSIBLE_AMOUNT,
+				B.PRACTICE_AMOUNT,
+				A.USER_PHONE_NUMBER,
+				A.RECOMMEND_ID,
+				A.INSERTDATE,
+				A.USER_IP,
+				A.UPDATEDATE,
+				A.UPDATE_ID,
+				B.BONUS,
+				A.USER_LEVEL,
+				A.DEL_YN,
+				A.LOGIN_FAIL_CNT
+			FROM
+			    TB_USER A,
+			    TB_USER_AMOUNT B
+			where A.USER_ID = #{user_id}
+			  AND A.USER_ID = B.USER_ID
+		]]>
+	</select>
+	
+	
+	
+	<insert id="insert_loginHis" parameterType="hashmap" useGeneratedKeys="true" keyProperty="id">
+		<![CDATA[
+			INSERT INTO TB_USER_LOGIN_HIS
+			(
+				USER_ID
+				,LOGIN_TIME
+			)
+			VALUES
+			(
+				#{id}
+				,#{now_time}
+			)
+		]]>
+	</insert>
+	
+	<update id="update_fail_cnt" parameterType="hashmap" flushCache="true">
+		<![CDATA[
+			update TB_USER
+			   set LOGIN_FAIL_CNT = (select FAIL_CNT from (select LOGIN_FAIL_CNT+1 as FAIL_CNT from TB_USER where USER_ID =#{id}) as tmp)
+			 where USER_ID = #{id};
+		]]>
+	</update>
+	
+	<update id="update_loginSuccess" parameterType="hashmap" flushCache="true">
+		<![CDATA[
+			update TB_USER
+			   set LOGIN_FAIL_CNT = 0
+			 where USER_ID = #{id};
+		]]>
+	</update>
+	
+	<update id="update_last_amount" parameterType="hashmap" flushCache="true">
+		<![CDATA[
+			update TB_USER_AMOUNT
+			    set LAST_AMOUNT = #{last_amount}
+			    	,TOT_AMOUNT = #{tot_amount}
+			    	,POSSIBLE_AMOUNT = #{possible_money}
+			    	,UPDATEDATE = GETDATE()
+			    	,UPDATEID = #{user_id}
+			    	,LAST_ACTKEY = #{actkey}
+			    	,LAST_ACT = #{last_act}
+			 where USER_ID = #{user_id}
+		]]>
+	</update>
+	
+	<update id="update_last_practice_amount" parameterType="hashmap" flushCache="true">
+		<![CDATA[
+			update TB_USER_AMOUNT
+			    set PRACTICE_AMOUNT = #{practice_amount}
+			    	,LAST_ACTKEY = #{actkey}
+			    	,LAST_ACT = #{last_act}
+			 where USER_ID = #{user_id}
+		]]>
+	</update>
+	
+	<insert id="insert_user_order" parameterType="hashmap" useGeneratedKeys="true" keyProperty="id">
+		<![CDATA[
+			INSERT INTO TB_USER_BET
+			(
+				ACTKEY,USER_ID,ORDER_TIME,COMP_TIME,STATUS,EVENT,INVEST_MONEY,GAME_TYPE
+				,CALLPUT,OPTION_TYPE,START_RATE,EXT_RATE,TOT_AMOUNT,LAST_AMOUNT,UPDATEDATE
+			)
+			VALUES
+			(
+				#{actkey},#{user_id},#{order_time},#{comp_time},'0',#{event},#{invest_money},#{game_type}
+				,#{callput},#{option_type},#{start_rate},#{ext_rate},#{tot_amount},#{last_amount},#{order_time}
+			)	
+		]]>
+	</insert>
+	
+	<insert id="insert_user_order02" parameterType="hashmap" useGeneratedKeys="true" keyProperty="id">
+		<![CDATA[
+			INSERT INTO TB_USER_BET
+			(
+				ACTKEY,USER_ID,ORDER_TIME,COMP_TIME,STATUS,EVENT,INVEST_MONEY,GAME_TYPE
+				,CALLPUT,OPTION_TYPE,START_RATE,EXT_RATE,TOT_AMOUNT,LAST_AMOUNT,UPDATEDATE,OANDAYN,BET_TURN
+			)
+			VALUES
+			(
+				#{actkey},#{user_id},#{order_time},#{comp_time},'0',#{event},#{invest_money},#{game_type}
+				,#{callput},#{option_type},#{start_rate},#{ext_rate},#{tot_amount},#{last_amount},#{order_time},'Y',#{bet_turn}
+			)	
+		]]>
+	</insert>
+	
+	<insert id="insert_user_order_practice" parameterType="hashmap" useGeneratedKeys="true" keyProperty="id">
+		<![CDATA[
+			INSERT INTO TB_USER_BET
+			(
+				ACTKEY,USER_ID,ORDER_TIME,COMP_TIME,STATUS,EVENT,INVEST_MONEY,GAME_TYPE
+				,CALLPUT,OPTION_TYPE,START_RATE,EXT_RATE,PRACTICE_AMOUNT,UPDATEDATE
+			)
+			VALUES
+			(
+				#{actkey},#{user_id},#{order_time},#{comp_time},'0',#{event},#{invest_money},#{game_type}
+				,#{callput},#{option_type},#{start_rate},#{ext_rate},#{practice_amount},#{order_time}
+			)	
+		]]>
+	</insert>
+	
+	<insert id="insert_user_order_practice02" parameterType="hashmap" useGeneratedKeys="true" keyProperty="id">
+		<![CDATA[
+			INSERT INTO TB_USER_BET
+			(
+				ACTKEY,USER_ID,ORDER_TIME,COMP_TIME,STATUS,EVENT,INVEST_MONEY,GAME_TYPE
+				,CALLPUT,OPTION_TYPE,START_RATE,EXT_RATE,PRACTICE_AMOUNT,UPDATEDATE,OANDAYN
+			)
+			VALUES
+			(
+				#{actkey},#{user_id},#{order_time},#{comp_time},'0',#{event},#{invest_money},#{game_type}
+				,#{callput},#{option_type},#{start_rate},#{ext_rate},#{practice_amount},#{order_time},'Y'
+			)	
+		]]>
+	</insert>
+	
+	<select id="loginLastInfo" parameterType="hashmap" resultType="hashmap">
+		<![CDATA[
+			SELECT *
+			  FROM (   
+					SELECT ROW_NUMBER() OVER(ORDER BY ORDER_TIME DESC) AS ROWNUM , A.GAME_TYPE,A.EVENT,A.OPTION_TYPE,B.TOT_AMOUNT,C.RATE,B.PRACTICE_AMOUNT
+					  FROM TB_USER_BET A,TB_USER_AMOUNT B,TB_COMMON_RATE C
+					 WHERE A.USER_ID = #{id}
+					   AND A.USER_ID = B.USER_ID
+					   AND A.EVENT = C.RATE_KEY
+					   AND C.STARTHH <=#{hh}
+				 	   AND C.ENDHH >=#{hh}
+					) T1
+			 WHERE  T1.ROWNUM =1
+		]]>
+	</select>
+	
+	<select id="loginLastInfo_n" parameterType="hashmap" resultType="hashmap">
+		<![CDATA[
+			SELECT *
+			  FROM (  
+					SELECT ROW_NUMBER() OVER(ORDER BY B.USER_ID DESC) AS ROWNUM,'P' AS GAME_TYPE,'GBPAUD' AS EVENT,'T' AS OPTION_TYPE,B.TOT_AMOUNT,C.RATE
+						  FROM TB_USER_AMOUNT B, TB_COMMON_RATE C
+						 WHERE C.RATE_KEY = 'GBPAUD'
+						   AND B.USER_ID = #{id}
+						   AND C.STARTHH <=#{hh}
+				 	   	   AND C.ENDHH >=#{hh}						   
+			 		) T1
+			 WHERE  T1.ROWNUM =1
+		]]>
+	</select>
+	
+	<select id="my_order" parameterType="hashmap" resultType="hashmap">
+		<![CDATA[
+			select A.USER_ID,A.EVENT,A.START_RATE,A.CALLPUT,A.INVEST_MONEY,A.EXT_RATE,B.TOT_AMOUNT
+			  from TB_USER_BET A,TB_USER_AMOUNT B
+			 where a.ACTKEY = #{order_key}
+			   AND A.USER_ID = B.USER_ID
+			   and A.STATUS = 0
+		]]>
+	</select>
+	
+	<select id="cron_order_result" parameterType="hashmap" resultType="hashmap">
+		<![CDATA[
+			select A.ACTKEY,A.COMP_TIME,A.USER_ID,A.EVENT,A.START_RATE,A.CALLPUT,A.INVEST_MONEY,A.EXT_RATE,A.GAME_TYPE
+			  from TB_USER_BET A
+			 where A.STATUS = 0
+			   and A.OANDAYN !='Y'
+			   and A.COMP_TIME = #{comp_time}
+		]]>
+	</select>
+	
+	<select id="cron_order_result02" parameterType="hashmap" resultType="hashmap">
+		<![CDATA[
+			select A.ACTKEY,A.COMP_TIME,A.USER_ID,A.EVENT,A.START_RATE,A.CALLPUT,A.INVEST_MONEY,A.EXT_RATE,A.GAME_TYPE,A.STATUS
+			  from TB_USER_BET A
+			 where A.STATUS = 0
+			   AND COMP_TIME <= #{comp_time}
+			 order by COMP_TIME
+			   
+		]]>
+	</select>
+	
+	
+	
+	<select id="return_result" parameterType="hashmap" resultType="hashmap">
+		<![CDATA[
+			select a.RESULT_FEE , b.TOT_AMOUNT
+			   from TB_USER_BET a, TB_USER_AMOUNT b
+			 where a.USER_ID = b.user_id
+			   and a.ACTKEY = #{order_key}
+		]]>
+	</select>
+	
+	<select id="result_receive" parameterType="hashmap" resultType="hashmap">
+		<![CDATA[
+			SELECT ACTKEY,USER_ID,ORDER_TIME,COMP_TIME,GAME_TYPE,STATUS,EVENT,INVEST_MONEY,OPTION_TYPE,CALLPUT,PRACTICE_AMOUNT
+					,START_RATE,END_RATE,EXT_RATE,INVEST_RESULT,RESULT_FEE,TOT_AMOUNT,LAST_AMOUNT,INSERTDATE,UPDATEDATE
+			  FROM TB_USER_BET
+			 WHERE COMP_TIME = #{c_time}
+			   AND USER_ID = #{user_id}
+			   AND STATUS = 1
+		]]>
+	</select>
+	
+	<select id="decomplete_bet" parameterType="hashmap" resultType="hashmap">
+		<![CDATA[
+			SELECT ACTKEY,USER_ID,ORDER_TIME,COMP_TIME,GAME_TYPE,STATUS,EVENT,INVEST_MONEY,OPTION_TYPE,CALLPUT,START_RATE,EXT_RATE
+			  FROM TB_USER_BET
+			 WHERE USER_ID = #{id}
+			   AND STATUS = 0
+			   AND COMP_TIME>#{cur_time}
+		]]>
+	</select>
+	
+	<select id="decomplete_deposit" parameterType="hashmap" resultType="hashmap">
+		<![CDATA[
+			SELECT IDX
+			  FROM TB_DEPOSIT
+			 WHERE ID = #{user_id}
+			   AND DEPOSIT_STATUS = 'N'
+		]]>
+	</select>
+	
+	<select id="receive_bank" parameterType="hashmap" resultType="hashmap">
+		<![CDATA[
+			SELECT CD,NM
+			  FROM TB_COMMON_CODE
+			 WHERE CODE = '0001'
+		]]>
+	</select>
+	
+	<select id="extRate_receive" parameterType="hashmap" resultType="hashmap">
+		<![CDATA[
+			SELECT RATE_KEY,CASE WHEN B.RATE_CTR IS NOT NULL THEN A.RATE+B.RATE_CTR ELSE A.RATE END AS RATE
+			  FROM TB_COMMON_RATE A,
+					TB_USER B
+			 WHERE A.STARTHH <=#{hh}
+				 AND A.ENDHH >=#{hh}
+				 AND B.USER_ID = #{user_id}
+		]]>
+	</select>
+	
+	<select id="result_receive_chk" parameterType="hashmap" resultType="hashmap">
+		<![CDATA[
+			SELECT COUNT(*) as CNT
+			  FROM TB_USER_BET
+			 WHERE COMP_TIME = #{c_time}
+			   AND USER_ID = #{user_id}
+			   AND STATUS = 0
+		]]>
+	</select>
+	
+	<select id="selectCommonRate" parameterType="hashmap" resultType="hashmap">
+		<![CDATA[
+		
+		SELECT CASE WHEN B.RATE_CTR IS NOT NULL THEN A.RATE+B.RATE_CTR ELSE A.RATE END AS RATE,B.USER_LEVEL,CASE WHEN B.RATE_CTR IS NOT NULL THEN B.RATE_CTR ELSE 0 END AS RATE_CTR,B.MIN_INVEST,A.LIMIT_STATUS,A.LIMIT_CNT,A.LIMIT_PCT,A.LIMIT_INVEST,A.EMERGENT_RATE+ISNULL(B.RATE_CTR,0) AS EMERGENT_RATE,
+		B.MAX_INVEST,C.TOTAL,C.LEVEL1,C.LEVEL2,C.LEVEL3,C.LEVEL4,C.LEVEL5,C.LEVEL6,C.LEVEL7,C.LEVEL8,C.LEVEL9,C.LEVEL10,F.COMP_CNT
+					,E.TOT_AMOUNT,E.PRACTICE_AMOUNT
+					,CASE WHEN D.USER_ID IS NULL THEN 'test01' ELSE D.USER_ID END AS RECOMMEND_ID
+					,CASE WHEN D.USER_LEVEL IS NULL THEN '1' ELSE D.USER_LEVEL END AS RECOMMEND_LEVEL
+					,A.RATE_STATUS
+			  FROM TB_COMMON_RATE AS A,TB_USER AS B
+			  LEFT OUTER JOIN TB_USER AS D ON B.RECOMMEND_ID = D.USER_ID
+			  ,TB_POINTSTYLE AS C,TB_USER_AMOUNT AS E
+			  ,(SELECT COUNT(*) AS COMP_CNT FROM TB_USER_BET WHERE STATUS = '0' AND EVENT=#{option} AND USER_ID = #{user_id} AND COMP_TIME = #{comp_time}) AS F
+			 WHERE A.RATE_KEY = #{option}
+				 AND A.STARTHH <=#{hh}
+				 AND A.ENDHH >=#{hh}
+				 AND B.USER_ID = #{user_id}
+				 AND B.POINT_STYLE = C.STYLE_ID
+				 AND B.USER_ID = E.USER_ID
+				 
+		]]>
+	</select>
+	
+	<select id="selectOrderHis" parameterType="hashmap" resultType="hashmap">
+		<![CDATA[
+		
+		SELECT CAL.CALLINV,PUT.PUTINV,CAL.CALLINV+PUT.PUTINV AS TOTINV
+		  FROM (
+				SELECT CASE WHEN SUM(INVEST_MONEY) IS NULL THEN 0 ELSE SUM(INVEST_MONEY) END AS CALLINV
+				  FROM TB_USER_BET
+				 WHERE EVENT = #{option} AND CALLPUT = 'CALL'
+				   AND COMP_TIME = #{comp_time}
+				   ) AS CAL
+				,
+				 (
+				SELECT CASE WHEN SUM(INVEST_MONEY) IS NULL THEN 0 ELSE SUM(INVEST_MONEY) END AS PUTINV
+				  FROM TB_USER_BET
+				 WHERE EVENT = #{option} AND CALLPUT = 'PUT'
+				   AND COMP_TIME = #{comp_time}
+				   ) AS PUT
+				 
+		]]>
+	</select>
+	
+	<select id="selectCallPut_pct" parameterType="hashmap" resultType="hashmap">
+		<![CDATA[
+			
+			 
+			SELECT A.CALLCNT,B.PUTCNT,C.ALLCNT
+			  FROM (
+					SELECT COUNT(ACTKEY) CALLCNT FROM TB_USER_BET WHERE CALLPUT = 'CALL' AND EVENT = #{option} AND COMP_TIME = #{comp_time} 
+					) AS A
+					,
+					(
+					SELECT COUNT(ACTKEY) PUTCNT FROM TB_USER_BET WHERE CALLPUT = 'PUT' AND EVENT = #{option} AND COMP_TIME = #{comp_time}
+					) AS B
+					,
+					(SELECT COUNT(ACTKEY) ALLCNT FROM TB_USER_BET WHERE EVENT = #{option} AND COMP_TIME = #{comp_time}) AS C
+			   
+		]]>
+	</select>
+	
+	<update id="update_user_order_final_win" parameterType="hashmap" flushCache="true">
+		<![CDATA[
+			update TB_USER_BET
+			   set STATUS = '1' 
+					,END_RATE = #{end_rate}
+			      ,INVEST_RESULT = #{game_result}
+			      ,RESULT_FEE = #{game_result_fee}
+			      ,TOT_AMOUNT = #{update_tot_amount}
+			      ,LAST_AMOUNT = #{update_last_amount}
+			 where ACTKEY = #{order_key}
+		]]>
+	</update>
+	
+	<update id="update_return_bonus" parameterType="hashmap" flushCache="true">
+		<![CDATA[
+			update TB_USER_AMOUNT
+			   set TOT_AMOUNT = (SELECT TOT_AMOUNT + #{return_bonus} FROM TB_USER_AMOUNT WHERE USER_ID = 'admin')
+			   	  ,POSSIBLE_AMOUNT = (SELECT POSSIBLE_AMOUNT + #{return_bonus} FROM TB_USER_AMOUNT WHERE USER_ID = 'admin')
+			      ,LAST_AMOUNT = (SELECT TOT_AMOUNT FROM TB_USER_AMOUNT WHERE USER_ID = 'admin')
+			      ,UPDATEDATE = GETDATE()
+			      ,UPDATEID = #{user_id}
+			      ,LAST_ACTKEY = #{actkey}
+			      ,LAST_ACT = 'return bonus'
+			 where user_id = 'admin'
+		]]>
+	</update>
+	
+	<update id="cron_result_master" parameterType="hashmap" flushCache="true">
+		<![CDATA[
+			update TB_USER_AMOUNT
+			   set TOT_AMOUNT = (SELECT TOT_AMOUNT + #{result_money} FROM TB_USER_AMOUNT WHERE USER_ID = 'admin')
+			   	  ,POSSIBLE_AMOUNT = (SELECT POSSIBLE_AMOUNT + #{result_money} FROM TB_USER_AMOUNT WHERE USER_ID = 'admin')
+			      ,LAST_AMOUNT = (SELECT TOT_AMOUNT FROM TB_USER_AMOUNT WHERE USER_ID = 'admin')
+			      ,UPDATEDATE = GETDATE()
+			      ,UPDATEID = #{user_id}
+			      ,LAST_ACTKEY = #{actkey}
+			      ,LAST_ACT = #{last_act}
+			 where user_id = 'admin'
+		]]>
+	</update>
+	
+	<update id="update_user_amount_win" parameterType="hashmap" flushCache="true">
+		<![CDATA[
+			update TB_USER_AMOUNT
+			    set TOT_AMOUNT = #{update_tot_amount}
+			      ,LAST_AMOUNT = #{update_last_amount}
+			      ,LAST_ACTKEY = #{order_key}
+			      ,LAST_ACT = #{last_act}
+			 where USER_ID = #{user_id}
+		]]>
+	</update>
+	
+	<update id="update_user_order_final_lose" parameterType="hashmap" flushCache="true">
+		<![CDATA[
+			update TB_USER_BET
+			    set STATUS = '1'
+			    	,INVEST_RESULT = #{game_result}
+			    	,RESULT_FEE = 0
+			    	,END_RATE = #{end_rate}
+			 where ACTKEY = #{order_key}
+		]]>
+	</update>
+	
+	<update id="cron_order_result_proc" parameterType="hashmap" flushCache="true">
+		<![CDATA[
+			update TB_USER_BET
+			    set STATUS = '1'
+			    	,INVEST_RESULT = #{invest_result}
+			    	,RESULT_FEE = #{result_fee}
+			    	,END_RATE = #{end_rate}
+			    	,TOT_AMOUNT = #{result_user_tot_amount}
+			    	,LAST_AMOUNT = #{result_user_last_amount}
+			    	,UPDATEDATE = getdate()
+			 where ACTKEY = #{actkey}
+			   
+		]]>
+	</update>
+	
+	<update id="cron_order_result_proc_practice" parameterType="hashmap" flushCache="true">
+		<![CDATA[
+			update TB_USER_BET
+			    set STATUS = '1'
+			    	,INVEST_RESULT = #{invest_result}
+			    	,RESULT_FEE = #{result_fee}
+			    	,END_RATE = #{end_rate}
+			    	,PRACTICE_AMOUNT = #{result_user_practice_amount}
+			    	,UPDATEDATE = getdate()
+			 where ACTKEY = #{actkey}
+			 	
+		]]>
+	</update>
+	
+	<update id="cron_user_amount" parameterType="hashmap" flushCache="true">
+		<![CDATA[
+			update TB_USER_AMOUNT
+			    set TOT_AMOUNT = #{result_user_tot_amount}
+			    	,LAST_AMOUNT = #{result_user_last_amount}
+			    	,UPDATEDATE = #{comp_time}
+			    	,POSSIBLE_AMOUNT = #{result_user_possible_amount}
+			    	,LAST_ACTKEY = #{actkey}
+			    	,LAST_ACT = #{last_act}
+			    	,SUM_FEE = (SELECT SUM_FEE - #{result_fee} FROM TB_USER_AMOUNT WHERE USER_ID = #{user_id})
+			 where USER_ID = #{user_id}
+		]]>
+	</update>
+	
+	<update id="cron_user_amount_practice" parameterType="hashmap" flushCache="true">
+		<![CDATA[
+			update TB_USER_AMOUNT
+			    set PRACTICE_AMOUNT = #{result_user_practice_amount}
+			    	,UPDATEDATE = #{comp_time}
+			    	,LAST_ACTKEY = #{actkey}
+			    	,LAST_ACT = #{last_act}
+			 where USER_ID = #{user_id}
+		]]>
+	</update>
+	
+	<insert id="insert_cron_fxdata" parameterType="hashmap" useGeneratedKeys="true" keyProperty="id">
+		<![CDATA[
+			INSERT INTO TB_FXDATA
+			(ID,NAME,RATE,INSERTDATE)
+			VALUES
+			(#{id},#{name},#{rate},#{comp_time})
+		]]>
+	</insert>
+	
+	<insert id="batch_fxdata_backup" parameterType="hashmap" useGeneratedKeys="true" keyProperty="id">
+		<![CDATA[
+			INSERT INTO TB_FXDATA_BAK
+			SELECT * FROM TB_FXDATA WHERE INSERTDATE<#{cur_time}
+		]]>
+	</insert>
+	
+	<delete id="batch_delete_fxdata" parameterType="hashmap">
+		<![CDATA[
+  			DELETE FROM TB_FXDATA WHERE INSERTDATE < #{cur_time}
+  		]]>
+	</delete>
+	
+	<select id="cron_fxdata_id" parameterType="hashmap" resultType="hashmap">
+		<![CDATA[
+			SELECT T1.* FROM (
+				SELECT ROW_NUMBER() OVER(ORDER BY INSERTDATE DESC) ROWNUM,RATE
+				  FROM TB_FXDATA
+				 WHERE ID = #{event}
+			 ) T1
+			 WHERE ROWNUM = 1
+			 
+		]]>
+	</select>
+	
+	<select id="selectLimitCom" parameterType="hashmap" resultType="hashmap">
+		<![CDATA[
+			SELECT isnull(A.APPLY_MONEY,0) + isnull(C.RECCOM,0) TOTDEP, isnull(B.TOTCOM,0) TOTCOM
+			  FROM (select SUM(APPLY_MONEY) APPLY_MONEY ,ID FROM TB_DEPOSIT WHERE DEPOSIT_STATUS = 'Y' AND ID = #{user_id} GROUP BY ID) A
+				FULL OUTER JOIN (SELECT RECEIVER_ID ,SUM(COMMISSION) RECCOM FROM TB_COMMISSION_HIS WHERE RECEIVER_ID = #{user_id} GROUP BY RECEIVER_ID) C ON A.ID = C.RECEIVER_ID
+				LEFT OUTER JOIN (SELECT SENDER_ID,SUM(COMMISSION) TOTCOM FROM TB_COMMISSION_HIS WHERE SENDER_ID = #{user_id} GROUP BY SENDER_ID) B ON A.ID = B.SENDER_ID
+			 
+		]]>
+	</select>
+	
+	<select id="cron_fxdata_insertdate" parameterType="hashmap" resultType="hashmap">
+		<![CDATA[
+			SELECT T1.* FROM (
+				SELECT ROW_NUMBER() OVER(ORDER BY INSERTDATE DESC) ROWNUM,RATE,INSERTDATE
+				  FROM TB_FXDATA
+				 WHERE INSERTDATE = #{comp_time}				 
+			 ) T1
+			 WHERE ROWNUM = 1
+			 
+		]]>
+	</select>
+	
+	<update id="update_commission" parameterType="hashmap" flushCache="true">
+		<![CDATA[
+			UPDATE TB_USER_AMOUNT
+			   SET TOT_AMOUNT = (SELECT TOT_AMOUNT FROM TB_USER_AMOUNT WHERE USER_ID = #{update_id})+#{update_money}
+			   	  ,POSSIBLE_AMOUNT = (SELECT POSSIBLE_AMOUNT FROM TB_USER_AMOUNT WHERE USER_ID = #{update_id})+#{update_money}
+			      ,LAST_AMOUNT = (SELECT TOT_aMOUNT FROM TB_USER_AMOUNT WHERE USER_ID = #{update_id})
+			      ,UPDATEDATE = #{order_time}
+			      ,UPDATEID = #{user_id}
+			      ,LAST_ACTKEY = #{actkey}
+			      ,LAST_ACT = #{last_act}
+			 WHERE USER_ID = #{update_id}
+			   
+		]]>
+	</update>		
+	
+	<update id="update_commission_tocom" parameterType="hashmap" flushCache="true">
+		<![CDATA[
+			UPDATE TB_USER_AMOUNT
+			   SET TOT_AMOUNT = (SELECT TOT_AMOUNT FROM TB_USER_AMOUNT WHERE USER_ID = 'admin')+#{update_money_tocom}
+			   	  ,POSSIBLE_AMOUNT = (SELECT POSSIBLE_AMOUNT FROM TB_USER_AMOUNT WHERE USER_ID = 'admin')+#{update_money_tocom}
+			      ,LAST_AMOUNT = (SELECT TOT_aMOUNT FROM TB_USER_AMOUNT WHERE USER_ID = 'admin')
+			      ,UPDATEDATE = #{order_time}
+			      ,UPDATEID = #{user_id}
+			      ,LAST_ACTKEY = #{actkey}
+			      ,LAST_ACT = #{last_act}
+			 WHERE USER_ID = 'admin'
+			   
+		]]>
+	</update>
+	
+	<select id="select_level_id" parameterType="hashmap" resultType="String">
+		<![CDATA[
+			SELECT USER_ID
+			  FROM TB_USER 
+			  WHERE USER_ID = (
+					SELECT RECOMMEND_ID
+					FROM TB_USER
+					WHERE USER_ID = #{level_id}
+					)
+			 AND USER_LEVEL = #{level_level}
+			 
+		]]>
+	</select>
+	
+	<select id="select_minus_bonus" parameterType="hashmap" resultType="String">
+		<![CDATA[
+			
+			 
+			 SELECT SUM(INPUT_BONUS) MINUS_BONUS
+			  FROM TB_USER_BONUS
+			 WHERE USER_ID = #{user_id}
+			   AND BONUS_STATUS = 'N'
+			 
+		]]>
+	</select>
+	
+	<select id="select_recommend" parameterType="hashmap" resultType="String">
+		<![CDATA[
+			SELECT USER_ID
+			  FROM TB_USER
+			 WHERE USER_LEVEL != 10
+			   AND USER_ID = #{recommend_id}
+			 
+		]]>
+	</select>
+	
+	<select id="select_recommend02" parameterType="hashmap" resultType="String">
+		<![CDATA[
+			SELECT CASE WHEN USER_LEVEL=10 THEN RECOMMEND_ID ELSE USER_ID END AS RECOMMEND
+			  FROM TB_USER
+			 WHERE 1=1
+			   AND USER_ID =#{recommend_id}
+		]]>
+	</select>
+	
+	<select id="encrypt_pw" parameterType="hashmap" resultType="String">
+		<![CDATA[
+			select PwdEncrypt(#{user_pwd}) AS PASSWORD
+		]]>
+	</select>
+	
+	<select id="duplicate_user_id" parameterType="hashmap" resultType="String">
+		<![CDATA[
+			SELECT USER_ID FROM TB_USER WHERE USER_ID = #{user_id}
+		]]>
+	</select>
+	
+	<select id="duplicate_phone_number" parameterType="hashmap" resultType="String">
+		<![CDATA[
+			SELECT USER_ID FROM TB_USER WHERE USER_PHONE_NUMBER = #{phone_number}
+		]]>
+	</select>
+	
+	<insert id="join" parameterType="hashmap" useGeneratedKeys="true" keyProperty="id">
+		<![CDATA[
+			INSERT INTO TB_USER
+			(USER_ID,USER_PWD,USER_NAME,USER_EMAIL,USER_PHONE_NUMBER,USER_BANK_NUMBER,USER_BANK_CD,USER_BANK_NM,USER_NICKNAME,USER_BIRTHDAY,USER_ADDRESS
+			,USER_LANGUAGE,RECOMMEND_ID,USER_LEVEL,USER_STATUS,DEL_YN,USER_IP,LOGIN_FAIL_CNT,POINT_STYLE,RATE_CTR,MAX_INVEST,MIN_INVEST,password)
+			values
+			(#{user_id},#{user_pwd},#{user_name},#{user_email},#{user_phone_number},#{user_bank_number},#{user_bank_cd},#{user_bank_nm},#{user_nickname}
+			,#{user_birthday},#{user_Address},#{user_language},#{recommend_id}
+			,'10','S','N',#{user_ip},0,(SELECT POINT_STYLE FROM TB_USER WHERE USER_ID=#{recommend_id}),0,800000,1,(select PwdEncrypt(#{user_pwd}) AS PASSWORD))
+		]]>
+	</insert>
+	
+	<insert id="join_first" parameterType="hashmap" useGeneratedKeys="true" keyProperty="id">
+		<![CDATA[
+			INSERT INTO TB_USER
+			(USER_ID,USER_PWD,RECOMMEND_ID,USER_PHONE_NUMBER,
+			USER_LEVEL,USER_STATUS,DEL_YN,USER_IP,LOGIN_FAIL_CNT,POINT_STYLE,RATE_CTR,
+			MAX_INVEST,MIN_INVEST,password)
+			VALUES
+			(#{user_id},#{user_pwd},#{recommend},#{phone_number},10,'S','N',#{client_ip},0,
+			(SELECT POINT_STYLE FROM TB_USER WHERE USER_ID=#{recommend}),
+			0,800000,1,
+			(select PwdEncrypt(#{user_pwd}) AS PASSWORD))
+		]]>
+	</insert>
+	
+	<insert id="join_first_amount" parameterType="hashmap" useGeneratedKeys="true" keyProperty="id">
+		<![CDATA[
+			INSERT INTO TB_USER_AMOUNT
+			(ACCOUNT_NUMBER,USER_ID,TOT_AMOUNT,PRACTICE_AMOUNT,LAST_AMOUNT,BONUS,INCOMP_BONUS
+			,POSSIBLE_AMOUNT,CURRENCY)
+			VALUES
+			((SELECT CONVERT(VARCHAR,MAX(ACCOUNT_NUMBER)+1) FROM TB_USER_AMOUNT)
+			,#{user_id},0,100000,0,0,0
+			,0,'KRW')
+		]]>
+	</insert>
+	
+	<insert id="insert_phone_confirm" parameterType="hashmap" useGeneratedKeys="true" keyProperty="id">
+		<![CDATA[
+			INSERT INTO TB_PHONE_CONFIRM(
+			USER_ID,USER_NAME,USER_PHONE_NUMBER,CONFIRM_NUMBER,CONFIRM_END_TIME,KEYVALUE)
+			VALUES
+			(#{id},#{user_name},#{phone_number},#{confirm_number},#{confirm_end_time},#{keyvalue})
+		]]>
+	</insert>
+	
+	<select id="select_confirm_number" parameterType="hashmap" resultType="String">
+		<![CDATA[
+		SELECT CONFIRM_YN
+  		FROM (
+			SELECT CASE WHEN CONFIRM_END_TIME<GETDATE() THEN 'D' 
+			WHEN CONFIRM_END_TIME>=GETDATE() AND CONFIRM_NUMBER=#{confirm_number} THEN 'Y' ELSE 'N' END AS CONFIRM_YN
+			,INSERTDATE,ROW_NUMBER() OVER(ORDER BY INSERTDATE DESC) ROWNUM
+			  FROM TB_PHONE_CONFIRM
+			WHERE KEYVALUE=#{keyvalue}
+			  AND CONFIRM_YN = 'N'
+			  AND USER_ID = #{user_id}
+			  ) AS A
+		WHERE ROWNUM = 1
+		]]>
+	</select>
+	
+	<select id="select_user_phone_number" parameterType="hashmap" resultType="String">
+		<![CDATA[
+			SELECT USER_PHONE_NUMBER
+			  FROM TB_USER
+			 WHERE USER_ID = #{user_id}
+			   AND USER_PHONE_NUMBER = #{phone_number}
+		]]>
+	</select>
+	
+	<update id="update_confirm" parameterType="hashmap" flushCache="true">
+		<![CDATA[
+			UPDATE TB_PHONE_CONFIRM
+				SET UPDATEDATE = GETDATE()
+					,CONFIRM_YN = 'Y'
+				WHERE KEYVALUE = #{keyvalue}
+				  AND CONFIRM_YN = 'N'
+		]]>
+	</update>
+	
+	<update id="update_user_pw" parameterType="hashmap" flushCache="true">
+		<![CDATA[
+			UPDATE TB_USER
+				SET password = (select PwdEncrypt(#{change_pw}) AS PASSWORD)
+					,USER_PWD = #{change_pw}
+					,UPDATEDATE = GETDATE()
+					,UPDATE_ID = #{user_id}
+					,LOGIN_FAIL_CNT=0
+				WHERE USER_ID = #{user_id}
+		]]>
+	</update>
+	
+	<update id="update_user_name" parameterType="hashmap" flushCache="true">
+		<![CDATA[
+			UPDATE TB_USER
+				SET USER_NAME = #{user_name}
+					,UPDATEDATE = GETDATE()					
+				WHERE USER_ID = #{user_id}
+				
+		]]>
+	</update>
+	
+	<update id="cron_update_refill_practice" parameterType="hashmap" flushCache="true">
+		<![CDATA[
+			UPDATE TB_USER_AMOUNT
+				SET PRACTICE_AMOUNT = 100000
+			 WHERE PRACTICE_AMOUNT <10000
+			   and user_id!='master'
+		]]>
+	</update>
+	
+	<update id="update_confirm_tb_user" parameterType="hashmap" flushCache="true">
+		<![CDATA[
+			UPDATE TB_USER
+			   SET USER_NAME = #{user_name}			      
+				  ,USER_BANK_NUMBER = #{account_number}
+				  ,USER_BANK_CD = (SELECT CD FROM TB_COMMON_CODE WHERE CODE = '0001' AND CD = #{bank_cd})
+				  ,USER_BANK_NM = (SELECT NM FROM TB_COMMON_CODE WHERE CODE = '0001' AND CD = #{bank_cd})
+				  ,UPDATEDATE = GETDATE()
+				  ,UPDATE_ID = #{user_id}
+				  ,UPDATE_IP = #{client_ip}
+			 WHERE USER_ID = #{user_id}
+		]]>
+	</update>
+	
+	<insert id="insert_deposit" parameterType="hashmap" useGeneratedKeys="true" keyProperty="id">
+		<![CDATA[
+			INSERT INTO TB_DEPOSIT
+			 (ID,ACCOUNT_NUMBER,APPLY_MONEY,DEPOSIT_BONUS,RULE_IDX)
+			 VALUES
+			 (#{user_id},#{account_number},#{apply_money},#{deposit_bonus},#{apply_deposit})
+		]]>
+	</insert>
+	
+	<insert id="insert_refund" parameterType="hashmap" useGeneratedKeys="true" keyProperty="id">
+		<![CDATA[
+			INSERT INTO TB_REFUND
+			(ID,ACCOUNT_NUMBER,APPLY_MONEY)
+			VALUES
+			(#{user_id},#{account_number},#{apply_money})
+		]]>
+	</insert>
+	
+	<select id="select_account_number" parameterType="hashmap" resultType="String">
+		<![CDATA[
+			SELECT ACCOUNT_NUMBER FROM TB_USER_AMOUNT WHERE USER_ID = #{id}
+		]]>
+	</select>
+	
+	<select id="select_possible_money" parameterType="hashmap" resultType="String">
+		<![CDATA[
+			SELECT POSSIBLE_AMOUNT FROM TB_USER_AMOUNT
+ 			WHERE USER_ID=#{user_id}
+		]]>
+	</select>
+	
+	<select id="select_deposit" parameterType="hashmap" resultType="BigDecimal">
+		<![CDATA[
+			SELECT DEPOSIT_MONEY FROM TB_BONUS_RULE WHERE IDX = #{apply_deposit}
+		]]>
+	</select>
+	
+	<select id="select_user_bonus" parameterType="hashmap" resultType="hashmap">
+		<![CDATA[
+			SELECT IDX,MISSION_MONEY,PROCESSED_BONUS
+			  FROM TB_USER_BONUS
+			 WHERE USER_ID = #{user_id}
+			   AND BONUS_STATUS = 'N'
+		]]>
+	</select>
+	
+	<select id="select_user_bonus_sum" parameterType="hashmap" resultType="hashmap">
+		<![CDATA[
+			SELECT ISNULL(SUM(A.MISSION_MONEY),0) AS MISSION_MONEY,ISNULL(SUM(A.PROCESSED_BONUS),0) AS PROCESSED_BONUS, ISNULL(SUM(A.INPUT_BONUS),0) AS INPUT_BONUS,B.POSSIBLE_AMOUNT
+			  FROM TB_USER_AMOUNT AS B LEFT OUTER JOIN TB_USER_BONUS AS A ON A.USER_ID = B.USER_ID AND A.BONUS_STATUS = 'N'
+			 WHERE B.USER_ID = #{user_id}			   
+			GROUP BY B.POSSIBLE_AMOUNT
+		]]>
+	</select>
+	
+	<update id="update_bonus" parameterType="hashmap" flushCache="true">
+		<![CDATA[
+			UPDATE TB_USER_BONUS
+		     SET PROCESSED_BONUS = (SELECT PROCESSED_BONUS + #{chul_money} from TB_USER_BONUS WHERE IDX = #{idx})
+			    ,UPDATEDATE = GETDATE()
+			    ,UPDATEID =#{user_id} 
+			    ,LAST_ACTKEY = #{actkey}
+		 WHERE USER_ID = #{user_id}
+		   AND IDX = #{idx}
+		]]>
+	</update>
+	
+	<select id="receive_deposit_his" parameterType="hashmap" resultType="hashmap">
+		<![CDATA[
+			SELECT ROWNUM,ID,APPLY_DATE,APPLY_MONEY,DEPOSIT_STATUS,UPDATEID,DEPOSIT_BONUS,UPDATEDATE
+			  FROM (
+				SELECT ROW_NUMBER() OVER(ORDER BY APPLY_DATE DESC) ROWNUM, ID,APPLY_DATE,APPLY_MONEY,DEPOSIT_STATUS,UPDATEID,DEPOSIT_BONUS,UPDATEDATE
+				  FROM TB_DEPOSIT
+				 WHERE ID = #{user_id}
+				 ) AS A
+			 WHERE ROWNUM<=20
+		]]>
+	</select>
+	
+	<select id="receivefx03" parameterType="hashmap" resultType="hashmap">
+		<![CDATA[
+			SELECT A.RATE_KEY,CASE WHEN B.RATE_CTR IS NOT NULL THEN A.RATE+B.RATE_CTR ELSE A.RATE END AS RATE,B.USER_LEVEL,CASE WHEN B.RATE_CTR IS NOT NULL THEN B.RATE_CTR ELSE 0 END AS RATE_CTR,B.MIN_INVEST,A.LIMIT_STATUS,A.LIMIT_CNT,A.LIMIT_PCT,A.LIMIT_INVEST,A.EMERGENT_RATE+ISNULL(B.RATE_CTR,0) AS EMERGENT_RATE,
+		B.MAX_INVEST,C.TOTAL,C.LEVEL1,C.LEVEL2,C.LEVEL3,C.LEVEL4,C.LEVEL5,C.LEVEL6,C.LEVEL7,C.LEVEL8,C.LEVEL9,C.LEVEL10,ISNULL(F.COMP_CNT,0) COMP_CNT
+					,E.TOT_AMOUNT,E.PRACTICE_AMOUNT
+					,CASE WHEN D.USER_ID IS NULL THEN 'fxeve' ELSE D.USER_ID END AS RECOMMEND_ID
+					,CASE WHEN D.USER_LEVEL IS NULL THEN '3' ELSE D.USER_LEVEL END AS RECOMMEND_LEVEL
+					,A.RATE_STATUS
+					,ISNULL(CAL.CALLCNT,0) CALLCNT
+					,ISNULL(PUT.PUTCNT,0) PUTCNT
+					,ISNULL(AL.ALLCNT,0) ALLCNT
+					,CASE WHEN AL.ALLCNT !=0 THEN ROUND(ISNULL(CAL.CALLCNT,0)/CONVERT(FLOAT,ISNULL(AL.ALLCNT,0)),1)*100 ELSE 0 END CALLPCT
+					,CASE WHEN AL.ALLCNT !=0 THEN ROUND(ISNULL(PUT.PUTCNT,0)/CONVERT(FLOAT,ISNULL(AL.ALLCNT,0)),1)*100 ELSE 0 END PUTPCT
+					,BONUS.MISSION_MONEY,BONUS.PROCESSED_BONUS,BONUS.INPUT_BONUS,BONUS.POSSIBLE_AMOUNT									
+			  FROM TB_COMMON_RATE AS A
+			  LEFT OUTER JOIN (SELECT EVENT,COUNT(*) AS COMP_CNT FROM TB_USER_BET WHERE STATUS = '0' AND USER_ID = #{user_id} AND COMP_TIME =  #{comp_time} GROUP BY EVENT) AS F ON F.EVENT = A.RATE_KEY
+			  LEFT OUTER JOIN (SELECT EVENT,COUNT(ACTKEY) CALLCNT FROM TB_USER_BET WHERE CALLPUT = 'CALL' AND STATUS ='0' AND GAME_TYPE = 'R' AND COMP_TIME =  #{comp_time} GROUP BY EVENT) CAL ON A.RATE_KEY = CAL.EVENT
+			  LEFT OUTER JOIN (SELECT EVENT,COUNT(ACTKEY) PUTCNT FROM TB_USER_BET WHERE CALLPUT = 'PUT' AND STATUS ='0' AND GAME_TYPE = 'R' AND COMP_TIME =  #{comp_time} GROUP BY EVENT) PUT ON A.RATE_KEY = PUT.EVENT
+			  LEFT OUTER JOIN (SELECT EVENT,COUNT(ACTKEY) ALLCNT FROM TB_USER_BET WHERE GAME_TYPE = 'R' AND STATUS ='0' AND COMP_TIME =  #{comp_time} GROUP BY EVENT) AL ON A.RATE_KEY = AL.EVENT
+			  ,TB_USER AS B
+			  LEFT OUTER JOIN TB_USER AS D ON B.RECOMMEND_ID = D.USER_ID
+			  LEFT OUTER JOIN (SELECT ISNULL(SUM(A.MISSION_MONEY),0) AS MISSION_MONEY,ISNULL(SUM(A.PROCESSED_BONUS),0) AS PROCESSED_BONUS, ISNULL(SUM(A.INPUT_BONUS),0) AS INPUT_BONUS,B.POSSIBLE_AMOUNT
+								  FROM TB_USER_AMOUNT AS B LEFT OUTER JOIN TB_USER_BONUS AS A ON A.USER_ID = B.USER_ID AND A.BONUS_STATUS = 'N'
+								 WHERE B.USER_ID = #{user_id}
+								GROUP BY B.POSSIBLE_AMOUNT
+								) BONUS ON 1=1
+			  ,TB_POINTSTYLE AS C,TB_USER_AMOUNT AS E			  			  
+			 WHERE 1=1			 
+				 AND A.STARTHH <=#{hh}
+				 AND A.ENDHH >=#{hh}
+				 AND B.USER_ID = #{user_id}
+				 AND B.POINT_STYLE = C.STYLE_ID
+				 AND B.USER_ID = E.USER_ID
+		]]>
+	</select>
+	
+	<select id="receive_client_notice" parameterType="hashmap" resultType="hashmap">
+		<![CDATA[
+			SELECT S_DATE,E_DATE,CONTENTS FROM (
+				SELECT ROW_NUMBER() OVER(ORDER BY REG_DATE DESC) ROWNUM,TITLE,CONTENTS,S_DATE,E_DATE
+				  FROM T_BOARD
+				  WHERE 1=1
+				    AND HOMEPAGE_YN = 'Y'
+				) A
+		]]>
+	</select>
+	
+	<select id="receive_myorder" parameterType="hashmap" resultType="hashmap">
+		<![CDATA[
+			SELECT ROWNUM,COMP,USER_ID,ORDER_TIME,COMP_TIME,EVENT,START_RATE,END_RATE,EXT_RATE,INVEST_MONEY,OPTION_TYPE,CALLPUT,START_RATE,ISNULL(RESULT_FEE,0) AS RES_FEE,GAME_TYPE
+			  FROM (
+			SELECT ROW_NUMBER() OVER(ORDER BY ORDER_TIME DESC) ROWNUM
+				,CASE WHEN STATUS='1' THEN 'Y' WHEN STATUS='0' THEN 'N' ELSE '' END  COMP
+				,USER_ID,ORDER_TIME,COMP_TIME,EVENT,INVEST_MONEY,OPTION_TYPE,CALLPUT,START_RATE,END_RATE,EXT_RATE,RESULT_FEE,GAME_TYPE
+			  FROM TB_USER_BET
+			 WHERE USER_ID = #{user_id}
+			   
+			 ) AS A
+			 WHERE ROWNUM<=20
+		]]>
+	</select>
+	
+	<select id="receive_mydecomplete_order" parameterType="hashmap" resultType="hashmap">
+		<![CDATA[
+			SELECT ORDER_TIME,COMP_TIME,EVENT,INVEST_MONEY,CALLPUT,START_RATE,EXT_RATE,GAME_TYPE
+			  FROM TB_USER_BET
+			 WHERE USER_ID = #{user_id}
+			   AND EVENT = #{event}
+			   AND STATUS = '0'
+			   AND SUBSTRING(CONVERT(NVARCHAR, COMP_TIME, 121), 15, 2)>#{cur_mm}
+		]]>
+	</select>
+	
+	<select id="receive_refund_his" parameterType="hashmap" resultType="hashmap">
+		<![CDATA[
+			SELECT ROWNUM,ID,APPLY_DATE,APPLY_MONEY,REFUND_STATUS,UPDATEID,UPDATEDATE
+			  FROM (
+				SELECT ROW_NUMBER() OVER(ORDER BY APPLY_DATE DESC) ROWNUM, ID,APPLY_DATE,APPLY_MONEY,REFUND_STATUS,UPDATEID,UPDATEDATE
+				  FROM TB_REFUND
+				 WHERE ID = #{user_id}
+				 ) AS A
+			 WHERE ROWNUM<=20 
+		]]>
+	</select>
+	
+	<select id="amount_flag" parameterType="hashmap" resultType="hashmap">
+		<![CDATA[
+			SELECT USER_BANK_CD
+			  FROM TB_USER WHERE USER_ID = #{id}
+			 AND USER_BANK_CD is not NULL 
+		]]>
+	</select>
+	
+	<select id="deposit_info" parameterType="hashmap" resultType="hashmap">
+		<![CDATA[
+			SELECT IDX,DEPOSIT_MONEY,BONUS_PER,MISSION_MULTIPLE
+  			FROM TB_BONUS_RULE
+		]]>
+	</select>
+	
+	<update id="update_amount_refund" parameterType="hashmap" flushCache="true">
+		<![CDATA[
+			update TB_USER_AMOUNT
+			   set TOT_AMOUNT = (select POSSIBLE_AMOUNT-#{apply_money} FROM TB_USER_AMOUNT WHERE USER_ID = #{user_id})
+			   	  ,POSSIBLE_AMOUNT = (select POSSIBLE_AMOUNT-#{apply_money} FROM TB_USER_AMOUNT WHERE USER_ID = #{user_id})
+			   	  ,UPDATEID = 	#{user_id}
+			   	  ,UPDATEDATE = GETDATE()
+			   	  ,LAST_AMOUNT = (SELECT TOT_AMOUNT FROM TB_USER_AMOUNT WHERE USER_ID = #{user_id})
+			   	  ,LAST_ACTKEY = #{actkey}
+			   	  ,LAST_ACT = #{last_act}
+			 where USER_ID = #{user_id};
+		]]>
+	</update>
+	
+	<update id="update_amount_refund_admin" parameterType="hashmap" flushCache="true">
+		<![CDATA[
+			update TB_USER_AMOUNT
+			   set TOT_AMOUNT = (select TOT_AMOUNT+#{minus_bonus} FROM TB_USER_AMOUNT WHERE USER_ID = 'admin')
+			   	  ,POSSIBLE_AMOUNT = (select POSSIBLE_AMOUNT+#{minus_bonus} FROM TB_USER_AMOUNT WHERE USER_ID = 'admin')
+			   	  ,UPDATEID = 	#{user_id}
+			   	  ,UPDATEDATE = GETDATE()
+			   	  ,LAST_AMOUNT = (SELECT TOT_AMOUNT FROM TB_USER_AMOUNT WHERE USER_ID = 'admin')
+			   	  ,LAST_ACTKEY = ''
+			   	  ,LAST_ACT = '회원출금보너스처리'
+			 where USER_ID = 'admin';
+		]]>
+	</update>
+	
+	<update id="update_bonus_refund_c" parameterType="hashmap" flushCache="true">
+		<![CDATA[
+			update TB_USER_BONUS
+			   set BONUS_STATUS = 'C'
+			      ,UPDATEDATE = GETDATE()
+			      ,UPDATEID = #{user_id}
+			 where USER_ID = #{user_id}
+			   and BONUS_STATUS = 'N'
+		]]>
+	</update>
+	
+	<insert id="insert_commission_his" parameterType="hashmap" useGeneratedKeys="true" keyProperty="id">
+		<![CDATA[
+			
+			
+			INSERT INTO TB_COMMISSION_HIS
+			(SENDER_ID,RECEIVER_ID,COMMISSION,ACTKEY,GUBUN,RECEIVER_LEVEL,BET_TURN,ACT_USER)
+			VALUES
+			(#{user_id},#{update_id},#{update_money},#{actkey},#{commission_gubun},#{update_level},#{bet_turn},#{user_id})
+		]]>
+	</insert>
+	
+	<insert id="insert_commission_his_tocom" parameterType="hashmap" useGeneratedKeys="true" keyProperty="id">
+		<![CDATA[
+			
+			
+			INSERT INTO TB_COMMISSION_HIS
+			(SENDER_ID,RECEIVER_ID,COMMISSION,ACTKEY,GUBUN,RECEIVER_LEVEL,BET_TURN,ACT_USER)
+			VALUES
+			(#{update_id},'admin',#{update_money_tocom},#{actkey},#{commission_gubun},'0',#{bet_turn},#{user_id})
+		]]>
+	</insert>
+	
+	<select id="select_myorder" parameterType="hashmap" resultType="hashmap">
+		<![CDATA[
+			select A.ACTKEY,A.COMP_TIME,A.USER_ID,A.EVENT,A.START_RATE,A.CALLPUT,A.INVEST_MONEY,A.EXT_RATE,A.GAME_TYPE
+			  from TB_USER_BET A
+			 where A.STATUS = 0
+			   and A.ACTKEY = #{actkey}
+		]]>
+	</select>
+	
+	<select id="join_first_sp_recom" parameterType="hashmap">
+		<![CDATA[
+			   {call
+            SP_RECOM_REG(
+                       '0',#{user_id},#{recommend},'없음',0,#{user_id}
+          			  )
+  		     }
+		]]>
+	</select>
+	
+	<select id="select_openclose" parameterType="hashmap" resultType="hashmap">
+		<![CDATA[
+			SELECT TURM,STARTDAY,STARTTIME,ENDDAY,ENDTIME,STARTDAYCODE,ENDDAYCODE FROM TB_OPENCLOSE
+		]]>
+	</select>
+	
+	<insert id="insert_abnormal_his" parameterType="hashmap" useGeneratedKeys="true" keyProperty="id">
+		<![CDATA[
+			insert into tb_abnormal_his
+			(user_id,abnormal_cd,abnormal_desc,client_ip,insertdate)
+			values
+			(#{user_id},#{abnormal_cd},#{abnormal_desc},#{client_ip},GETDATE())
+		]]>
+	</insert>
+	
+	<update id="cron_order_result02_update1" parameterType="hashmap" flushCache="true">
+		<![CDATA[
+			update TB_USER_BET
+			   set STATUS = '2'
+			 where STATUS = '0'
+			   AND COMP_TIME <= #{comp_time}
+		]]>
+	</update>
+	
+	<update id="cron_order_result02_update2" parameterType="hashmap" flushCache="true">
+		<![CDATA[
+			update TB_USER_BET
+			   set STATUS = '0'
+			 where STATUS = '2'
+			   AND ACTKEY = #{actkey}
+		]]>
+	</update>
+</mapper>

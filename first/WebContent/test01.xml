@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ExchangeList
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+    xmlns="http://www.xignite.com/services/">
+    <Outcome>RegistrationError</Outcome>
+    <Message>XigniteGlobalRealTime: Maximum number of unregistered requests exceeded. Consider registering or subscribing to expand usage.Your request was authenticated using an HTTP request parameter. Your token is C11D35334B424E60A63AC4BB24C5AFC7.  Please visit http://www.xignite.com/registration-help for more information. (globalrealtime.xignite.com: 20) </Message>
+    <Identity>Request</Identity>
+    <Delay>0.0235907</Delay>
+</ExchangeList>
